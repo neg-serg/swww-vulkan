@@ -1,0 +1,137 @@
+mod cli;
+mod daemon;
+mod ipc;
+
+use clap::Parser;
+
+use swww_vulkan_common::ipc_types::*;
+
+use crate::cli::*;
+use crate::ipc::{IpcClient, IpcError};
+
+#[tokio::main]
+async fn main() {
+    let cli = Cli::parse();
+
+    if let Err(e) = run(cli).await {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
+}
+
+async fn run(cli: Cli) -> Result<(), String> {
+    match cli.command {
+        Commands::Init => {
+            daemon::init().await?;
+            Ok(())
+        }
+        Commands::Kill => {
+            daemon::kill().await?;
+            Ok(())
+        }
+        Commands::Img {
+            path,
+            outputs,
+            resize,
+            transition_type,
+            transition_duration,
+            transition_step,
+            transition_fps,
+            transition_angle,
+            transition_pos,
+            transition_bezier,
+            transition_wave,
+        } => {
+            let position = parse_position(&transition_pos)?;
+            let bezier = parse_bezier(&transition_bezier)?;
+            let wave = parse_wave(&transition_wave)?;
+
+            let cmd = IpcCommand::Img {
+                path,
+                outputs: parse_outputs(&outputs),
+                resize: resize.into(),
+                transition: TransitionParams {
+                    transition_type: transition_type.into(),
+                    duration_secs: transition_duration,
+                    step: transition_step,
+                    fps: transition_fps,
+                    angle: transition_angle,
+                    position,
+                    bezier,
+                    wave,
+                },
+            };
+
+            send_and_check(cmd).await
+        }
+        Commands::Clear { color, outputs } => {
+            let rgb = parse_color(&color)?;
+            let cmd = IpcCommand::Clear {
+                outputs: parse_outputs(&outputs),
+                color: rgb,
+            };
+            send_and_check(cmd).await
+        }
+        Commands::Query => {
+            let mut client = connect_or_error().await?;
+            let response = client
+                .send_command(&IpcCommand::Query)
+                .await
+                .map_err(|e| format!("query failed: {e}"))?;
+
+            match response {
+                IpcResponse::QueryResult { outputs } => {
+                    for info in outputs {
+                        let path = info.wallpaper_path.as_deref().unwrap_or("(none)");
+                        let dims = info
+                            .dimensions
+                            .map(|(w, h)| format!("({w}x{h})"))
+                            .unwrap_or_default();
+                        let state = match info.state {
+                            OutputState::Idle => "[idle]".to_string(),
+                            OutputState::Transitioning => "[transitioning]".to_string(),
+                            OutputState::Playing { frame, total } => {
+                                format!("[playing frame {frame}/{total}]")
+                            }
+                        };
+                        println!("{}: {path} {dims} {state}", info.name);
+                    }
+                    Ok(())
+                }
+                IpcResponse::Error { message } => Err(message),
+                _ => Err("unexpected response".to_string()),
+            }
+        }
+        Commands::Restore => send_and_check(IpcCommand::Restore).await,
+        Commands::Pause { outputs } => {
+            send_and_check(IpcCommand::Pause {
+                outputs: parse_outputs(&outputs),
+            })
+            .await
+        }
+        Commands::ClearCache => send_and_check(IpcCommand::ClearCache).await,
+    }
+}
+
+async fn connect_or_error() -> Result<IpcClient, String> {
+    IpcClient::connect().await.map_err(|e| match e {
+        IpcError::DaemonNotRunning => {
+            "daemon is not running. Start it with 'swww-vulkan init'.".to_string()
+        }
+        other => format!("failed to connect: {other}"),
+    })
+}
+
+async fn send_and_check(cmd: IpcCommand) -> Result<(), String> {
+    let mut client = connect_or_error().await?;
+    let response = client
+        .send_command(&cmd)
+        .await
+        .map_err(|e| format!("command failed: {e}"))?;
+
+    match response {
+        IpcResponse::Ok => Ok(()),
+        IpcResponse::Error { message } => Err(message),
+        _ => Err("unexpected response from daemon".to_string()),
+    }
+}
