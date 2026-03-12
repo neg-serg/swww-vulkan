@@ -42,6 +42,11 @@ pub enum TransitionType {
     Grow,
     Wave,
     Outer,
+    Pixelate,
+    Swirl,
+    Blinds,
+    Diamond,
+    Dissolve,
     Random,
     None,
 }

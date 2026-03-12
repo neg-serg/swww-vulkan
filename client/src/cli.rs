@@ -117,6 +117,11 @@ pub enum TransitionTypeArg {
     Grow,
     Wave,
     Outer,
+    Pixelate,
+    Swirl,
+    Blinds,
+    Diamond,
+    Dissolve,
     Random,
     None,
 }
@@ -147,6 +152,11 @@ impl From<TransitionTypeArg> for swww_vulkan_common::ipc_types::TransitionType {
             TransitionTypeArg::Grow => Self::Grow,
             TransitionTypeArg::Wave => Self::Wave,
             TransitionTypeArg::Outer => Self::Outer,
+            TransitionTypeArg::Pixelate => Self::Pixelate,
+            TransitionTypeArg::Swirl => Self::Swirl,
+            TransitionTypeArg::Blinds => Self::Blinds,
+            TransitionTypeArg::Diamond => Self::Diamond,
+            TransitionTypeArg::Dissolve => Self::Dissolve,
             TransitionTypeArg::Random => Self::Random,
             TransitionTypeArg::None => Self::None,
         }

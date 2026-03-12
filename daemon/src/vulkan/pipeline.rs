@@ -460,6 +460,11 @@ pub enum TransitionKind {
     Grow,
     Wave,
     Outer,
+    Pixelate,
+    Swirl,
+    Blinds,
+    Diamond,
+    Dissolve,
 }
 
 impl TransitionPipeline {

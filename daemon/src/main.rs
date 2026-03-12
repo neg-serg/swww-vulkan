@@ -164,6 +164,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             (TransitionKind::Grow, "transition_grow.frag"),
             (TransitionKind::Wave, "transition_wave.frag"),
             (TransitionKind::Outer, "transition_outer.frag"),
+            (TransitionKind::Pixelate, "transition_pixelate.frag"),
+            (TransitionKind::Swirl, "transition_swirl.frag"),
+            (TransitionKind::Blinds, "transition_blinds.frag"),
+            (TransitionKind::Diamond, "transition_diamond.frag"),
+            (TransitionKind::Dissolve, "transition_dissolve.frag"),
         ]
         .into_iter()
         .filter_map(|(kind, name)| shaders.get(name).map(|m| (kind, m)))

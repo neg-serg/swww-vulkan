@@ -14,6 +14,11 @@ pub fn resolve_kind(tt: TransitionType) -> Option<TransitionKind> {
         TransitionType::Grow => Some(TransitionKind::Grow),
         TransitionType::Wave => Some(TransitionKind::Wave),
         TransitionType::Outer => Some(TransitionKind::Outer),
+        TransitionType::Pixelate => Some(TransitionKind::Pixelate),
+        TransitionType::Swirl => Some(TransitionKind::Swirl),
+        TransitionType::Blinds => Some(TransitionKind::Blinds),
+        TransitionType::Diamond => Some(TransitionKind::Diamond),
+        TransitionType::Dissolve => Some(TransitionKind::Dissolve),
         TransitionType::Random => Some(pick_random()),
         TransitionType::None => None,
     }
@@ -26,6 +31,11 @@ fn pick_random() -> TransitionKind {
         TransitionKind::Grow,
         TransitionKind::Wave,
         TransitionKind::Outer,
+        TransitionKind::Pixelate,
+        TransitionKind::Swirl,
+        TransitionKind::Blinds,
+        TransitionKind::Diamond,
+        TransitionKind::Dissolve,
     ];
     // Simple pseudo-random using time nanos
     let nanos = Instant::now().elapsed().subsec_nanos() as usize;
@@ -53,6 +63,11 @@ pub fn create_transition(
             TransitionKind::Grow => TransitionType::Grow,
             TransitionKind::Wave => TransitionType::Wave,
             TransitionKind::Outer => TransitionType::Outer,
+            TransitionKind::Pixelate => TransitionType::Pixelate,
+            TransitionKind::Swirl => TransitionType::Swirl,
+            TransitionKind::Blinds => TransitionType::Blinds,
+            TransitionKind::Diamond => TransitionType::Diamond,
+            TransitionKind::Dissolve => TransitionType::Dissolve,
         },
         kind,
         duration_secs: params.duration_secs,
