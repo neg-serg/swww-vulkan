@@ -26,11 +26,11 @@ pub enum Commands {
         resize: ResizeArg,
 
         /// Transition type
-        #[arg(long, default_value = "none")]
+        #[arg(long, default_value = "random")]
         transition_type: TransitionTypeArg,
 
         /// Transition duration in seconds
-        #[arg(long, default_value = "3.0")]
+        #[arg(long, default_value = "0.5")]
         transition_duration: f32,
 
         /// Frame step size (1-255)
