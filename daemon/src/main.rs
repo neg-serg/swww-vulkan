@@ -342,6 +342,12 @@ fn complete_transition(daemon: &mut DaemonState, output_name: &str) {
         // with output.wallpaper.texture (set during transition start).
         // GpuTexture has no Drop impl, so just not calling destroy() is safe.
         t.old_texture.destroy(&daemon.vk.device);
+        // Free the transition descriptor set back to the pool.
+        if let Some(ds) = t.descriptor_set {
+            if let Some(ref tp) = daemon.transition_pipeline {
+                tp.free_descriptor_set(&daemon.vk.device, ds);
+            }
+        }
     }
 
     // Update descriptor set to point to the wallpaper's texture (which has new_texture's handles)
@@ -661,11 +667,18 @@ fn set_static_wallpaper(
             if should_transition {
                 let kind = transition_kind.unwrap();
 
-                // Cancel any existing transition
+                // Cancel any existing transition: free its old texture and descriptor set.
+                // The existing transition's new_texture handles are shared with
+                // output.wallpaper.texture, so we must NOT destroy new_texture here.
                 if let Some(old_transition) = output.transition.take() {
-                    // SAFETY: GPU is idle.
+                    // SAFETY: GPU is idle (device_wait_idle called above).
                     unsafe {
                         old_transition.old_texture.destroy(&daemon.vk.device);
+                        if let Some(ds) = old_transition.descriptor_set {
+                            if let Some(ref tp) = daemon.transition_pipeline {
+                                tp.free_descriptor_set(&daemon.vk.device, ds);
+                            }
+                        }
                     }
                 }
 
@@ -805,6 +818,11 @@ fn handle_clear(
                 if let Some(t) = output.transition.take() {
                     t.old_texture.destroy(&daemon.vk.device);
                     t.new_texture.destroy(&daemon.vk.device);
+                    if let Some(ds) = t.descriptor_set {
+                        if let Some(ref tp) = daemon.transition_pipeline {
+                            tp.free_descriptor_set(&daemon.vk.device, ds);
+                        }
+                    }
                 }
                 output.clear_wallpaper(&daemon.vk.device);
             }

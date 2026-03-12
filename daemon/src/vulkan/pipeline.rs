@@ -564,6 +564,7 @@ impl TransitionPipeline {
             .descriptor_count(MAX_OUTPUTS * 2);
 
         let pool_info = vk::DescriptorPoolCreateInfo::default()
+            .flags(vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET)
             .max_sets(MAX_OUTPUTS)
             .pool_sizes(std::slice::from_ref(&pool_size));
 
@@ -636,6 +637,20 @@ impl TransitionPipeline {
         // SAFETY: device, descriptor_set, views, and sampler are all valid.
         unsafe {
             device.update_descriptor_sets(&writes, &[]);
+        }
+    }
+
+    /// Free a previously allocated descriptor set back to the pool.
+    ///
+    /// # Safety
+    /// The descriptor set must not be in use by any command buffer.
+    pub unsafe fn free_descriptor_set(
+        &self,
+        device: &ash::Device,
+        descriptor_set: vk::DescriptorSet,
+    ) {
+        unsafe {
+            let _ = device.free_descriptor_sets(self.descriptor_pool, &[descriptor_set]);
         }
     }
 
