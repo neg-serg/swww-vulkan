@@ -53,10 +53,10 @@ void main() {
     float dist = length(delta);
 
     // Swirl strength peaks at progress=0.5, zero at boundaries
-    float strength = pc.wave_x * 0.1 * sin(pc.progress * PI);
+    float strength = pc.wave_x * 0.15 * sin(pc.progress * PI);
 
     // Rotation decreases with distance from center
-    float max_radius = 0.7;
+    float max_radius = 0.8;
     float falloff = clamp(1.0 - dist / max_radius, 0.0, 1.0);
     float rotation = strength * falloff * falloff;
 
@@ -71,19 +71,19 @@ void main() {
     // Clamp to valid UV range
     swirled_uv = clamp(swirled_uv, vec2(0.0), vec2(1.0));
 
-    // First half: swirl old image; second half: swirl new image
-    bool show_new = pc.progress >= 0.5;
+    // Wide smooth crossfade — image swap is hidden by swirl distortion
+    float blend = smoothstep(0.25, 0.75, pc.progress);
 
-    vec2 uv = swirled_uv;
-    vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
+    vec2 old_uv = swirled_uv;
+    vec2 new_uv = swirled_uv;
 
-    if (show_new) {
-        if (apply_resize(uv, pc.new_resize_mode, pc.new_img_aspect, pc.screen_aspect))
-            color = texture(u_new, uv);
-    } else {
-        if (apply_resize(uv, pc.old_resize_mode, pc.old_img_aspect, pc.screen_aspect))
-            color = texture(u_old, uv);
-    }
+    vec4 old_color = vec4(0.0, 0.0, 0.0, 1.0);
+    vec4 new_color = vec4(0.0, 0.0, 0.0, 1.0);
 
-    f_color = color;
+    if (apply_resize(old_uv, pc.old_resize_mode, pc.old_img_aspect, pc.screen_aspect))
+        old_color = texture(u_old, old_uv);
+    if (apply_resize(new_uv, pc.new_resize_mode, pc.new_img_aspect, pc.screen_aspect))
+        new_color = texture(u_new, new_uv);
+
+    f_color = mix(old_color, new_color, blend);
 }

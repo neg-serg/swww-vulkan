@@ -57,9 +57,10 @@ void main() {
     // Position within current strip [0, 1]
     float strip_pos = fract(coord * num_strips);
 
-    // Each strip opens from center: reveal when strip_pos is within progress range
-    float half_open = pc.progress;
-    float mask = step(abs(strip_pos - 0.5), half_open * 0.5) * step(0.0, half_open);
+    // Each strip opens from center: reveal when distance from center < progress * 0.5
+    float edge = pc.progress * 0.5;
+    float dist_from_center = abs(strip_pos - 0.5);
+    float mask = 1.0 - smoothstep(max(edge - 0.02, 0.0), edge + 0.02, dist_from_center);
 
     vec2 old_uv = v_uv;
     vec2 new_uv = v_uv;
