@@ -1544,6 +1544,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "clap",
+ "image",
  "nix",
  "swww-vulkan-common",
  "tokio",

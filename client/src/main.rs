@@ -1,6 +1,7 @@
 mod cli;
 mod daemon;
 mod ipc;
+mod upscale;
 
 use clap::Parser;
 
@@ -41,14 +42,25 @@ async fn run(cli: Cli) -> Result<(), String> {
             transition_pos,
             transition_bezier,
             transition_wave,
+            upscale,
+            upscale_cmd,
+            upscale_scale,
         } => {
             let position = parse_position(&transition_pos)?;
             let bezier = parse_bezier(&transition_bezier)?;
             let wave = parse_wave(&transition_wave)?;
+            let parsed_outputs = parse_outputs(&outputs);
+
+            // Apply upscaling if requested.
+            let final_path = if upscale || upscale_cmd.is_some() || upscale_scale.is_some() {
+                upscale::upscale_image(&path, &upscale_cmd, &upscale_scale, &parsed_outputs).await
+            } else {
+                path
+            };
 
             let cmd = IpcCommand::Img {
-                path,
-                outputs: parse_outputs(&outputs),
+                path: final_path,
+                outputs: parsed_outputs,
                 resize: resize.into(),
                 transition: TransitionParams {
                     transition_type: transition_type.into(),

@@ -56,6 +56,20 @@ pub enum Commands {
         /// Wave frequency and amplitude as "freq,amp"
         #[arg(long, default_value = "20,20")]
         transition_wave: String,
+
+        /// Upscale low-resolution images using a neural network before display
+        #[arg(long)]
+        upscale: bool,
+
+        /// Custom upscaler command (implies --upscale).
+        /// Use {input} and {output} placeholders, or paths are appended as arguments.
+        #[arg(long)]
+        upscale_cmd: Option<String>,
+
+        /// Force a specific upscale factor (2, 4, 8, or 16) instead of auto-detecting.
+        /// Values above 4 use multiple upscaling passes. Implies --upscale.
+        #[arg(long, value_parser = parse_upscale_scale)]
+        upscale_scale: Option<u8>,
     },
 
     /// Clear wallpaper to solid color
@@ -114,6 +128,14 @@ impl From<ResizeArg> for swww_vulkan_common::ipc_types::ResizeMode {
             ResizeArg::Fit => Self::Fit,
             ResizeArg::No => Self::No,
         }
+    }
+}
+
+fn parse_upscale_scale(s: &str) -> Result<u8, String> {
+    let n: u8 = s.parse().map_err(|_| format!("invalid scale: '{s}'"))?;
+    match n {
+        2 | 4 | 8 | 16 => Ok(n),
+        _ => Err("upscale scale must be 2, 4, 8, or 16".to_string()),
     }
 }
 
