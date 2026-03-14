@@ -10,7 +10,7 @@ mod wayland;
 use std::collections::HashMap;
 use std::path::Path;
 
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use wl_common::ipc_types::*;
 
@@ -250,6 +250,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                         if let Err(e) = ipc::send_response(&mut stream, &response).await {
                             warn!("failed to send IPC response: {e}");
                         }
+                    }
+                    Err(ipc::IpcError::Io(ref e))
+                        if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+                    {
+                        // Probe connections (health checks) connect and
+                        // immediately disconnect without sending a command.
+                        // This is expected — log at debug, not warn.
+                        debug!("IPC probe connection (client disconnected without sending a command)");
                     }
                     Err(e) => {
                         warn!("IPC accept error: {e}");
