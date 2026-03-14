@@ -22,12 +22,12 @@ pub unsafe fn render_frame(
     let swapchain = output.swapchain.as_ref().ok_or(RenderError::NoSwapchain)?;
 
     // SAFETY: fence is valid, created in Output::new.
+    // Wait for the previous frame's fence but do NOT reset it yet.
+    // The fence stays signaled until just before queue_submit so that
+    // any early return leaves it in a signaled state for the next call.
     unsafe {
         vk.device
             .wait_for_fences(&[output.in_flight_fence], true, u64::MAX)
-            .map_err(RenderError::Vulkan)?;
-        vk.device
-            .reset_fences(&[output.in_flight_fence])
             .map_err(RenderError::Vulkan)?;
 
         // Free the previous frame's command buffer now that the fence has signaled.
@@ -69,9 +69,10 @@ pub unsafe fn render_frame(
 
     // SAFETY: cmd is freshly allocated.
     unsafe {
-        vk.device
-            .begin_command_buffer(cmd, &begin_info)
-            .map_err(RenderError::Vulkan)?;
+        if let Err(e) = vk.device.begin_command_buffer(cmd, &begin_info) {
+            vk.device.free_command_buffers(vk.command_pool, &[cmd]);
+            return Err(RenderError::Vulkan(e));
+        }
     }
 
     let swapchain = output.swapchain.as_ref().unwrap();
@@ -207,12 +208,14 @@ pub unsafe fn render_frame(
 
     // SAFETY: cmd is recording.
     unsafe {
-        vk.device
-            .end_command_buffer(cmd)
-            .map_err(RenderError::Vulkan)?;
+        if let Err(e) = vk.device.end_command_buffer(cmd) {
+            vk.device.free_command_buffers(vk.command_pool, &[cmd]);
+            return Err(RenderError::Vulkan(e));
+        }
     }
 
-    // Submit
+    // Submit — reset fence immediately before submit so it stays signaled on any
+    // earlier failure path, preventing a deadlock on the next wait_for_fences call.
     let wait_semaphores = [output.image_available_semaphore];
     let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
     let signal_semaphores = [output.render_finished_semaphore];
@@ -224,11 +227,22 @@ pub unsafe fn render_frame(
         .command_buffers(&command_buffers)
         .signal_semaphores(&signal_semaphores);
 
-    // SAFETY: All handles valid.
+    // SAFETY: All handles valid. Reset fence just before submit so that any failure
+    // before this point leaves the fence signaled (preventing deadlock on next frame).
     unsafe {
         vk.device
+            .reset_fences(&[output.in_flight_fence])
+            .map_err(|e| {
+                vk.device.free_command_buffers(vk.command_pool, &[cmd]);
+                RenderError::Vulkan(e)
+            })?;
+        if let Err(e) = vk
+            .device
             .queue_submit(vk.graphics_queue, &[submit_info], output.in_flight_fence)
-            .map_err(RenderError::Vulkan)?;
+        {
+            vk.device.free_command_buffers(vk.command_pool, &[cmd]);
+            return Err(RenderError::Vulkan(e));
+        }
     }
 
     // Present
