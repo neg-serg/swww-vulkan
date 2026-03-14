@@ -63,7 +63,6 @@ vec4 getToColor(vec2 uv) {
 }
 
 const int steps = 50;
-const float horizontalHexagons = 50.0;
 const float edgeWidth = 0.15;
 const vec3 edgeColor = vec3(1.0, 1.0, 1.0);
 
@@ -119,6 +118,7 @@ vec2 pointFromHexagon(Hexagon hex, float size) {
 }
 
 vec4 transition(vec2 uv) {
+    float horizontalHexagons = 17.0;
     float dist = 2.0 * min(pc.progress, 1.0 - pc.progress);
     dist = steps > 0 ? ceil(dist * float(steps)) / float(steps) : dist;
 
