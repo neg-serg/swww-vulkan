@@ -148,7 +148,6 @@ impl Output {
     }
 
     /// Effective resolution accounting for fractional scaling.
-    #[allow(dead_code)]
     pub fn effective_resolution(&self) -> (u32, u32) {
         (
             (self.width as f64 * self.scale_factor).round() as u32,

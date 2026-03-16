@@ -7,7 +7,9 @@ use std::fs;
 use std::io::{self, BufReader};
 use std::path::Path;
 
-use image::AnimationDecoder;
+use image::{AnimationDecoder, RgbaImage, imageops::FilterType};
+
+use crate::ipc_types::ResizeMode;
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -148,6 +150,67 @@ fn decode_svg(path: &Path) -> Result<DecodedImage, DecodeError> {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+/// Resize a decoded image to match the output's effective resolution.
+///
+/// - **Crop**: Center-crop the source to fill the target aspect ratio, then resize
+///   to target dimensions.
+/// - **Fit**: Scale to fit within target dimensions while preserving aspect ratio.
+/// - **No**: Return the image unchanged.
+///
+/// If the source dimensions already match the target, the image is returned as-is
+/// (zero-loss passthrough).
+pub fn resize_for_output(
+    img: DecodedImage,
+    target_w: u32,
+    target_h: u32,
+    mode: ResizeMode,
+) -> DecodedImage {
+    if mode == ResizeMode::No || (img.width == target_w && img.height == target_h) {
+        return img;
+    }
+
+    let src = RgbaImage::from_raw(img.width, img.height, img.data)
+        .expect("DecodedImage data length must match width*height*4");
+
+    match mode {
+        ResizeMode::Crop => {
+            let src_aspect = img.width as f64 / img.height as f64;
+            let tgt_aspect = target_w as f64 / target_h as f64;
+
+            let (crop_w, crop_h) = if src_aspect > tgt_aspect {
+                // Source is wider — crop horizontally
+                let w = (img.height as f64 * tgt_aspect).round() as u32;
+                (w.min(img.width), img.height)
+            } else {
+                // Source is taller — crop vertically
+                let h = (img.width as f64 / tgt_aspect).round() as u32;
+                (img.width, h.min(img.height))
+            };
+
+            let crop_x = (img.width.saturating_sub(crop_w)) / 2;
+            let crop_y = (img.height.saturating_sub(crop_h)) / 2;
+
+            let cropped = image::imageops::crop_imm(&src, crop_x, crop_y, crop_w, crop_h);
+            let resized = image::imageops::resize(&*cropped, target_w, target_h, FilterType::CatmullRom);
+            let (w, h) = resized.dimensions();
+            DecodedImage { data: resized.into_raw(), width: w, height: h }
+        }
+        ResizeMode::Fit => {
+            let scale_x = target_w as f64 / img.width as f64;
+            let scale_y = target_h as f64 / img.height as f64;
+            let scale = scale_x.min(scale_y);
+
+            let fit_w = (img.width as f64 * scale).round() as u32;
+            let fit_h = (img.height as f64 * scale).round() as u32;
+
+            let resized = image::imageops::resize(&src, fit_w.max(1), fit_h.max(1), FilterType::CatmullRom);
+            let (w, h) = resized.dimensions();
+            DecodedImage { data: resized.into_raw(), width: w, height: h }
+        }
+        ResizeMode::No => unreachable!(),
+    }
+}
 
 /// Decode an image file at `path` to raw RGBA8 pixel data.
 ///
