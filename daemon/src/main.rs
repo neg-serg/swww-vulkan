@@ -100,13 +100,18 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|e| format!("vk surface: {e}"))?
             };
 
+            // Use effective resolution (logical × scale) for the swapchain so
+            // the buffer matches the physical output pixels. wp_viewport maps
+            // the physical buffer back to the logical surface area.
+            let eff_w = (wl_output.width as f64 * wl_output.scale_factor).round() as u32;
+            let eff_h = (wl_output.height as f64 * wl_output.scale_factor).round() as u32;
             let swapchain = Swapchain::new(
                 &vk.instance,
                 &vk.device,
                 vk.physical_device,
                 vk_surface,
-                wl_output.width.max(1),
-                wl_output.height.max(1),
+                eff_w.max(1),
+                eff_h.max(1),
             )
             .map_err(|e| format!("swapchain: {e}"))?;
 

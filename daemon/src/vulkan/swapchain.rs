@@ -54,6 +54,17 @@ impl Swapchain {
         let present_mode = vk::PresentModeKHR::FIFO; // vsync, always supported
 
         let extent = Self::choose_extent(&capabilities, width, height);
+        tracing::info!(
+            requested_w = width, requested_h = height,
+            extent_w = extent.width, extent_h = extent.height,
+            cap_current_w = capabilities.current_extent.width,
+            cap_current_h = capabilities.current_extent.height,
+            cap_min_w = capabilities.min_image_extent.width,
+            cap_min_h = capabilities.min_image_extent.height,
+            cap_max_w = capabilities.max_image_extent.width,
+            cap_max_h = capabilities.max_image_extent.height,
+            "swapchain extent chosen"
+        );
         let image_count = Self::choose_image_count(&capabilities);
 
         let create_info = vk::SwapchainCreateInfoKHR::default()
