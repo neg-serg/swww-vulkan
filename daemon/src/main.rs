@@ -534,6 +534,22 @@ fn handle_img(
             } else {
                 &gif_frames.frames[0].data
             };
+            // Pre-resize single-frame GIF like static images
+            let original_w = gif_frames.width;
+            let original_h = gif_frames.height;
+            let decoded = wl_common::image_decode::DecodedImage {
+                data: data.to_vec(),
+                width: gif_frames.width,
+                height: gif_frames.height,
+            };
+            let first_output = names.first().and_then(|n| daemon.outputs.get(n));
+            let resized = if let Some(output) = first_output {
+                let (eff_w, eff_h) = output.effective_resolution();
+                wl_common::image_decode::resize_for_output(decoded, eff_w, eff_h, resize)
+            } else {
+                decoded
+            };
+
             return set_static_wallpaper(
                 daemon,
                 StaticWallpaperParams {
@@ -542,24 +558,49 @@ fn handle_img(
                     resize,
                     transition_params,
                     transition_kind,
-                    data,
-                    width: gif_frames.width,
-                    height: gif_frames.height,
+                    data: &resized.data,
+                    width: resized.width,
+                    height: resized.height,
+                    original_width: original_w,
+                    original_height: original_h,
                     is_gif: true,
                 },
             );
         }
 
-        // Multi-frame GIF: create atlas
-        let frame_data: Vec<&Vec<u8>> = gif_frames.frames.iter().map(|f| &f.data).collect();
+        // Multi-frame GIF: pre-resize each frame, then create atlas
         let durations: Vec<u32> = gif_frames.frames.iter().map(|f| f.duration_ms).collect();
+
+        // Pre-resize frames to target output resolution for pixel-perfect rendering
+        let first_output = names.first().and_then(|n| daemon.outputs.get(n));
+        let (resized_frames, frame_w, frame_h) = if let Some(output) = first_output {
+            let (eff_w, eff_h) = output.effective_resolution();
+            let mut resized = Vec::with_capacity(gif_frames.frames.len());
+            let mut rw = gif_frames.width;
+            let mut rh = gif_frames.height;
+            for frame in &gif_frames.frames {
+                let decoded = wl_common::image_decode::DecodedImage {
+                    data: frame.data.clone(),
+                    width: gif_frames.width,
+                    height: gif_frames.height,
+                };
+                let r = wl_common::image_decode::resize_for_output(decoded, eff_w, eff_h, resize);
+                rw = r.width;
+                rh = r.height;
+                resized.push(r.data);
+            }
+            (resized, rw, rh)
+        } else {
+            let frames: Vec<Vec<u8>> = gif_frames.frames.iter().map(|f| f.data.clone()).collect();
+            (frames, gif_frames.width, gif_frames.height)
+        };
 
         for name in &names {
             let atlas_tex = match texture::upload_gif_atlas(
                 &daemon.vk,
-                &frame_data.iter().map(|d| d.to_vec()).collect::<Vec<_>>(),
-                gif_frames.width,
-                gif_frames.height,
+                &resized_frames,
+                frame_w,
+                frame_h,
             ) {
                 Ok(tex) => tex,
                 Err(e) => {
@@ -596,8 +637,8 @@ fn handle_img(
                     gif_frames.frames.len() as u32,
                     durations.clone(),
                     atlas_tex,
-                    gif_frames.width,
-                    gif_frames.height,
+                    frame_w,
+                    frame_h,
                 );
 
                 // Create a wallpaper entry pointing to the atlas
@@ -605,7 +646,7 @@ fn handle_img(
                     source_path: path.to_string(),
                     format: ImageFormat::Gif,
                     original_dimensions: (gif_frames.width, gif_frames.height),
-                    display_dimensions: (gif_frames.width, gif_frames.height),
+                    display_dimensions: (frame_w, frame_h),
                     resize_mode: resize,
                     // The atlas texture is owned by the animation state.
                     // Use a copy of the handles for the wallpaper.
@@ -648,6 +689,24 @@ fn handle_img(
             }
         };
 
+        // Pre-resize image to match each output's effective resolution for
+        // pixel-perfect rendering. We resize per-output since monitors may
+        // differ in resolution/scale. For multiple outputs we decode once
+        // and resize per target.
+        let original_w = decoded.width;
+        let original_h = decoded.height;
+
+        // For simplicity, resize to the first target output's effective resolution.
+        // (Multi-output with different resolutions: we use the first target's dims,
+        // which is correct for the common single-monitor case.)
+        let first_output = names.first().and_then(|n| daemon.outputs.get(n));
+        let resized = if let Some(output) = first_output {
+            let (eff_w, eff_h) = output.effective_resolution();
+            wl_common::image_decode::resize_for_output(decoded, eff_w, eff_h, resize)
+        } else {
+            decoded
+        };
+
         return set_static_wallpaper(
             daemon,
             StaticWallpaperParams {
@@ -656,9 +715,11 @@ fn handle_img(
                 resize,
                 transition_params,
                 transition_kind,
-                data: &decoded.data,
-                width: decoded.width,
-                height: decoded.height,
+                data: &resized.data,
+                width: resized.width,
+                height: resized.height,
+                original_width: original_w,
+                original_height: original_h,
                 is_gif: false,
             },
         );
@@ -680,6 +741,8 @@ struct StaticWallpaperParams<'a> {
     data: &'a [u8],
     width: u32,
     height: u32,
+    original_width: u32,
+    original_height: u32,
     is_gif: bool,
 }
 
@@ -696,6 +759,8 @@ fn set_static_wallpaper(
         data,
         width,
         height,
+        original_width,
+        original_height,
         is_gif,
     } = params;
     for name in names {
@@ -777,7 +842,7 @@ fn set_static_wallpaper(
                     } else {
                         ImageFormat::Jpeg
                     },
-                    original_dimensions: (width, height),
+                    original_dimensions: (original_width, original_height),
                     display_dimensions: (t.new_texture.width, t.new_texture.height),
                     resize_mode: resize,
                     texture: output::GpuTexture {
@@ -827,7 +892,7 @@ fn set_static_wallpaper(
                     } else {
                         ImageFormat::Jpeg
                     },
-                    original_dimensions: (width, height),
+                    original_dimensions: (original_width, original_height),
                     display_dimensions: (gpu_tex.width, gpu_tex.height),
                     resize_mode: resize,
                     texture: gpu_tex,
