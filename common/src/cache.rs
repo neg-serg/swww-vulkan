@@ -130,7 +130,7 @@ pub fn save_session_state(state: &SessionState) -> Result<(), std::io::Error> {
 // Cache management
 // ---------------------------------------------------------------------------
 
-/// Remove all files in the cache directory.
+/// Remove all files in the cache directory (including upscale cache).
 ///
 /// The directory itself is preserved. If the directory does not exist this is a
 /// no-op.
@@ -154,4 +154,130 @@ pub fn clear_cache() -> Result<(), std::io::Error> {
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Upscale cache (T013)
+// ---------------------------------------------------------------------------
+
+const UPSCALE_DIR: &str = "upscale";
+const UPSCALE_INDEX: &str = "index.json";
+const MAX_UPSCALE_ENTRIES: usize = 50;
+
+/// Get upscale cache directory: `$XDG_CACHE_HOME/wl/upscale/`.
+pub fn upscale_cache_dir() -> PathBuf {
+    cache_dir().join(UPSCALE_DIR)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UpscaleCacheIndex {
+    pub entries: Vec<UpscaleCacheEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpscaleCacheEntry {
+    pub source_path: String,
+    pub source_mtime_secs: u64,
+    pub source_size: u64,
+    pub scale_factor: u8,
+    pub cached_filename: String,
+    pub created_at: u64,
+}
+
+impl UpscaleCacheIndex {
+    /// Look up a cache entry by source identity.
+    pub fn lookup(
+        &self,
+        source_path: &str,
+        mtime: u64,
+        size: u64,
+        scale: u8,
+    ) -> Option<&UpscaleCacheEntry> {
+        self.entries.iter().find(|e| {
+            e.source_path == source_path
+                && e.source_mtime_secs == mtime
+                && e.source_size == size
+                && e.scale_factor == scale
+        })
+    }
+
+    /// Insert a new entry, evicting the oldest if over the limit.
+    pub fn insert(&mut self, entry: UpscaleCacheEntry) {
+        // Remove any existing entry with the same identity
+        self.entries.retain(|e| {
+            !(e.source_path == entry.source_path
+                && e.source_mtime_secs == entry.source_mtime_secs
+                && e.source_size == entry.source_size
+                && e.scale_factor == entry.scale_factor)
+        });
+
+        self.entries.push(entry);
+
+        // Evict oldest entries beyond limit
+        while self.entries.len() > MAX_UPSCALE_ENTRIES {
+            let oldest_idx = self
+                .entries
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, e)| e.created_at)
+                .map(|(i, _)| i)
+                .unwrap();
+            let evicted = self.entries.remove(oldest_idx);
+            let evicted_path = upscale_cache_dir().join(&evicted.cached_filename);
+            let _ = std::fs::remove_file(evicted_path);
+        }
+    }
+}
+
+/// Load upscale cache index from disk.
+pub fn load_upscale_index() -> UpscaleCacheIndex {
+    let path = upscale_cache_dir().join(UPSCALE_INDEX);
+    match std::fs::read_to_string(&path) {
+        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
+        Err(_) => UpscaleCacheIndex::default(),
+    }
+}
+
+/// Save upscale cache index to disk.
+pub fn save_upscale_index(index: &UpscaleCacheIndex) -> Result<(), std::io::Error> {
+    let dir = upscale_cache_dir();
+    std::fs::create_dir_all(&dir)?;
+    let path = dir.join(UPSCALE_INDEX);
+    let json = serde_json::to_string_pretty(index)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    std::fs::write(&path, json)
+}
+
+// ---------------------------------------------------------------------------
+// Upscale preferences (T017)
+// ---------------------------------------------------------------------------
+
+const UPSCALE_PREFS_FILE: &str = "upscale-prefs.json";
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UpscalePrefs {
+    pub enabled: bool,
+    #[serde(default)]
+    pub custom_cmd: Option<String>,
+    #[serde(default)]
+    pub scale: Option<u8>,
+}
+
+/// Load upscale preferences from disk.
+pub fn load_upscale_prefs() -> UpscalePrefs {
+    let path = state_dir().join(UPSCALE_PREFS_FILE);
+    match std::fs::read_to_string(&path) {
+        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
+        Err(_) => UpscalePrefs::default(),
+    }
+}
+
+/// Save upscale preferences to disk.
+pub fn save_upscale_prefs(prefs: &UpscalePrefs) -> Result<(), std::io::Error> {
+    let dir = state_dir();
+    std::fs::create_dir_all(&dir)?;
+    let path = dir.join(UPSCALE_PREFS_FILE);
+    let json = serde_json::to_string_pretty(prefs)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    std::fs::write(&path, json)
 }
