@@ -42,9 +42,7 @@ pub async fn init() -> Result<(), String> {
 /// Send a kill command to the running daemon.
 pub async fn kill() -> Result<(), String> {
     let mut client = IpcClient::connect().await.map_err(|e| match e {
-        IpcError::DaemonNotRunning => {
-            "daemon is not running. Start it with 'wl init'.".to_string()
-        }
+        IpcError::DaemonNotRunning => "daemon is not running. Start it with 'wl init'.".to_string(),
         other => format!("failed to connect to daemon: {other}"),
     })?;
 

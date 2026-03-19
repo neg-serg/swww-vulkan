@@ -184,7 +184,11 @@ pub fn resize_for_output(
             let src_y = (img.height.saturating_sub(target_h)) / 2;
             let cropped = image::imageops::crop_imm(&src, src_x, src_y, paste_w, paste_h);
             image::imageops::overlay(&mut canvas, &*cropped, dst_x as i64, dst_y as i64);
-            DecodedImage { data: canvas.into_raw(), width: target_w, height: target_h }
+            DecodedImage {
+                data: canvas.into_raw(),
+                width: target_w,
+                height: target_h,
+            }
         }
         ResizeMode::Crop => {
             let src_aspect = img.width as f64 / img.height as f64;
@@ -204,9 +208,14 @@ pub fn resize_for_output(
             let crop_y = (img.height.saturating_sub(crop_h)) / 2;
 
             let cropped = image::imageops::crop_imm(&src, crop_x, crop_y, crop_w, crop_h);
-            let resized = image::imageops::resize(&*cropped, target_w, target_h, FilterType::CatmullRom);
+            let resized =
+                image::imageops::resize(&*cropped, target_w, target_h, FilterType::CatmullRom);
             let (w, h) = resized.dimensions();
-            DecodedImage { data: resized.into_raw(), width: w, height: h }
+            DecodedImage {
+                data: resized.into_raw(),
+                width: w,
+                height: h,
+            }
         }
         ResizeMode::Fit => {
             let scale_x = target_w as f64 / img.width as f64;
@@ -216,9 +225,14 @@ pub fn resize_for_output(
             let fit_w = (img.width as f64 * scale).round() as u32;
             let fit_h = (img.height as f64 * scale).round() as u32;
 
-            let resized = image::imageops::resize(&src, fit_w.max(1), fit_h.max(1), FilterType::CatmullRom);
+            let resized =
+                image::imageops::resize(&src, fit_w.max(1), fit_h.max(1), FilterType::CatmullRom);
             let (w, h) = resized.dimensions();
-            DecodedImage { data: resized.into_raw(), width: w, height: h }
+            DecodedImage {
+                data: resized.into_raw(),
+                width: w,
+                height: h,
+            }
         }
         ResizeMode::No => unreachable!(),
     }

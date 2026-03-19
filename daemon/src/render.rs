@@ -32,8 +32,7 @@ pub unsafe fn render_frame(
 
         // Free the previous frame's command buffer now that the fence has signaled.
         if let Some(old_cmd) = output.last_command_buffer.take() {
-            vk.device
-                .free_command_buffers(vk.command_pool, &[old_cmd]);
+            vk.device.free_command_buffers(vk.command_pool, &[old_cmd]);
         }
     }
 
@@ -102,7 +101,8 @@ pub unsafe fn render_frame(
 
             let resize_to_u32 = |m: wl_common::ipc_types::ResizeMode| -> u32 {
                 match m {
-                    wl_common::ipc_types::ResizeMode::Crop | wl_common::ipc_types::ResizeMode::Center => 0,
+                    wl_common::ipc_types::ResizeMode::Crop
+                    | wl_common::ipc_types::ResizeMode::Center => 0,
                     wl_common::ipc_types::ResizeMode::Fit => 1,
                     wl_common::ipc_types::ResizeMode::No => 2,
                 }
@@ -151,7 +151,9 @@ pub unsafe fn render_frame(
         let wallpaper = output.wallpaper.as_ref().unwrap();
 
         let resize_mode = match wallpaper.resize_mode {
-            wl_common::ipc_types::ResizeMode::Crop | wl_common::ipc_types::ResizeMode::Center => 0u32,
+            wl_common::ipc_types::ResizeMode::Crop | wl_common::ipc_types::ResizeMode::Center => {
+                0u32
+            }
             wl_common::ipc_types::ResizeMode::Fit => 1u32,
             wl_common::ipc_types::ResizeMode::No => 2u32,
         };
@@ -236,9 +238,9 @@ pub unsafe fn render_frame(
                 vk.device.free_command_buffers(vk.command_pool, &[cmd]);
                 RenderError::Vulkan(e)
             })?;
-        if let Err(e) = vk
-            .device
-            .queue_submit(vk.graphics_queue, &[submit_info], output.in_flight_fence)
+        if let Err(e) =
+            vk.device
+                .queue_submit(vk.graphics_queue, &[submit_info], output.in_flight_fence)
         {
             vk.device.free_command_buffers(vk.command_pool, &[cmd]);
             return Err(RenderError::Vulkan(e));

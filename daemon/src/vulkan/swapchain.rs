@@ -55,8 +55,10 @@ impl Swapchain {
 
         let extent = Self::choose_extent(&capabilities, width, height);
         tracing::info!(
-            requested_w = width, requested_h = height,
-            extent_w = extent.width, extent_h = extent.height,
+            requested_w = width,
+            requested_h = height,
+            extent_w = extent.width,
+            extent_h = extent.height,
             cap_current_w = capabilities.current_extent.width,
             cap_current_h = capabilities.current_extent.height,
             cap_min_w = capabilities.min_image_extent.width,
@@ -334,7 +336,10 @@ impl Swapchain {
             "swapchain format: {:?}, color_space: {:?} (available: {:?})",
             chosen.format,
             chosen.color_space,
-            formats.iter().map(|f| (f.format, f.color_space)).collect::<Vec<_>>()
+            formats
+                .iter()
+                .map(|f| (f.format, f.color_space))
+                .collect::<Vec<_>>()
         );
 
         Ok(chosen)

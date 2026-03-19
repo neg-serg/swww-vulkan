@@ -36,8 +36,8 @@ pub fn is_animated_gif(path: &Path) -> bool {
     }
 
     // Use image crate to check frame count (needs BufReader for AnimationDecoder)
-    use image::codecs::gif::GifDecoder;
     use image::AnimationDecoder;
+    use image::codecs::gif::GifDecoder;
     let file = match std::fs::File::open(path) {
         Ok(f) => f,
         Err(_) => return false,
@@ -87,11 +87,11 @@ pub async fn query_max_physical_resolution(
             let mut max_w = 0u32;
             let mut max_h = 0u32;
             for info in &filtered {
-                if let Some((w, h)) = info.physical_resolution {
-                    if w * h > max_w * max_h {
-                        max_w = w;
-                        max_h = h;
-                    }
+                if let Some((w, h)) = info.physical_resolution
+                    && w * h > max_w * max_h
+                {
+                    max_w = w;
+                    max_h = h;
                 }
             }
 
@@ -344,8 +344,7 @@ async fn upscale_image_inner(
     };
 
     // Canonicalize path for cache keying
-    let canonical = std::fs::canonicalize(img_path)
-        .unwrap_or_else(|_| img_path.to_path_buf());
+    let canonical = std::fs::canonicalize(img_path).unwrap_or_else(|_| img_path.to_path_buf());
     let canonical_str = canonical.to_string_lossy().to_string();
 
     // Get source identity for cache

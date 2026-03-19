@@ -297,10 +297,7 @@ impl WaylandState {
             .data
             .viewporter
             .as_ref()
-            .map(|vp| {
-                let viewport = vp.get_viewport(&surface, &qh, ());
-                viewport
-            });
+            .map(|vp| vp.get_viewport(&surface, &qh, ()));
 
         let output = &mut self.data.outputs[output_index];
         output.surface = Some(surface);
@@ -438,13 +435,12 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WaylandData {
                     state.fractional_scale_manager = Some(mgr);
                 }
                 "wp_viewporter" => {
-                    let vp = registry
-                        .bind::<wp_viewporter::WpViewporter, _, _>(
-                            name,
-                            version.min(1),
-                            qh,
-                            (),
-                        );
+                    let vp = registry.bind::<wp_viewporter::WpViewporter, _, _>(
+                        name,
+                        version.min(1),
+                        qh,
+                        (),
+                    );
                     tracing::debug!(version, "bound wp_viewporter");
                     state.viewporter = Some(vp);
                 }
