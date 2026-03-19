@@ -29,6 +29,18 @@ pub enum IpcCommand {
         outputs: Option<Vec<String>>,
     },
     ClearCache,
+    RotateStart {
+        directories: Vec<std::path::PathBuf>,
+        interval_secs: u64,
+        resize: ResizeMode,
+        transition: TransitionParams,
+        upscale_mode: Option<String>,
+        upscale_cmd: Option<String>,
+        upscale_scale: Option<u8>,
+    },
+    RotateStop,
+    RotateNext,
+    RotateStatus,
 }
 
 // ---------------------------------------------------------------------------
@@ -112,8 +124,20 @@ pub enum ResizeMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IpcResponse {
     Ok,
-    Error { message: String },
-    QueryResult { outputs: Vec<OutputInfo> },
+    Error {
+        message: String,
+    },
+    QueryResult {
+        outputs: Vec<OutputInfo>,
+    },
+    RotationStatus {
+        active: bool,
+        interval_secs: Option<u64>,
+        directories: Option<Vec<String>>,
+        next_change_secs: Option<u64>,
+        images_total: Option<usize>,
+        images_remaining: Option<usize>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

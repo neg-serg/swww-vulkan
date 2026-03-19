@@ -1,6 +1,3 @@
-// NOTE: serde_json must be added to common/Cargo.toml:
-//   serde_json = "1"
-
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -10,6 +7,7 @@ use crate::ipc_types::SOCKET_NAME;
 
 const APP_DIR: &str = "wl";
 const STATE_FILE: &str = "state.json";
+const ROTATION_STATE_FILE: &str = "rotation.json";
 
 // ---------------------------------------------------------------------------
 // Session state types
@@ -280,4 +278,53 @@ pub fn save_upscale_prefs(prefs: &UpscalePrefs) -> Result<(), std::io::Error> {
     let json = serde_json::to_string_pretty(prefs)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
     std::fs::write(&path, json)
+}
+
+// ---------------------------------------------------------------------------
+// Rotation state persistence
+// ---------------------------------------------------------------------------
+
+/// Persisted rotation state, saved to `rotation.json` in the state directory.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RotationPersist {
+    pub directories: Vec<String>,
+    pub interval_secs: u64,
+    pub candidates: Vec<String>,
+    pub current_index: usize,
+    pub resize_mode: String,
+    #[serde(default)]
+    pub transition_type: Option<String>,
+    #[serde(default)]
+    pub transition_duration: Option<f32>,
+    #[serde(default)]
+    pub upscale_mode: Option<String>,
+    #[serde(default)]
+    pub upscale_cmd: Option<String>,
+    #[serde(default)]
+    pub upscale_scale: Option<u8>,
+}
+
+/// Load rotation state from disk. Returns `None` if file does not exist.
+pub fn load_rotation_state() -> Option<RotationPersist> {
+    let path = state_dir().join(ROTATION_STATE_FILE);
+    match std::fs::read_to_string(&path) {
+        Ok(contents) => serde_json::from_str(&contents).ok(),
+        Err(_) => None,
+    }
+}
+
+/// Save rotation state to disk.
+pub fn save_rotation_state(state: &RotationPersist) -> Result<(), std::io::Error> {
+    let dir = state_dir();
+    std::fs::create_dir_all(&dir)?;
+    let path = dir.join(ROTATION_STATE_FILE);
+    let json = serde_json::to_string_pretty(state)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    std::fs::write(&path, json)
+}
+
+/// Delete rotation state file from disk.
+pub fn delete_rotation_state() {
+    let path = state_dir().join(ROTATION_STATE_FILE);
+    let _ = std::fs::remove_file(path);
 }
